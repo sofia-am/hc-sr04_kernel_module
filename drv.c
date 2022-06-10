@@ -18,6 +18,7 @@
 //Timer Variable
 #define TIMEOUT 1000 //milisegundos
 
+#define mem_size 5
 //Estructura para config de timer
 static struct timer_list timer;
 
@@ -25,8 +26,8 @@ static dev_t first; 		// Global variable for the first device number
 static struct cdev c_dev; 	// Global variable for the character device structure
 static struct class *cl; 	// Global variable for the device class
 
-char buffer_entrada[2];
-char buffer_salida[2];
+char *buffer_entrada;
+char *buffer_salida;
 int contador1;
 int contador2;
 
@@ -38,24 +39,23 @@ static int my_open(struct inode *i, struct file *f)
 static int my_close(struct inode *i, struct file *f)
 {
     printk(KERN_INFO "SdeC_drv4: close()\n");
+    //TODO: hacer los free 
     return 0;
 }
 
 void timer_callback(struct timer_list *data){
     pr_info("Valor entrada: %c \n",buffer_entrada[0]);
 
-
+    memset(buffer_salida, '\0', mem_size);
     switch (buffer_entrada[0])
         {
             case 'a':
                 contador1++;
                 if(contador1 == 30)
                     contador1 = 0;
-      
-                buffer_salida[0]=0;
-                buffer_salida[1]=0;
-                sprintf((char*)buffer_salida, "%d", contador1);
-                pr_info("Valor del contador1: %s \n",(char*) buffer_salida);
+       
+                sprintf(buffer_salida, "%d", contador1);
+                pr_info("Valor del contador1: %s \n",buffer_salida);
                 
                 break;
 
@@ -63,15 +63,12 @@ void timer_callback(struct timer_list *data){
                 contador2++;
                 if(contador2 == 30)
                     contador2 = 0;
-                                    
-                 buffer_salida[0]=0;
-                buffer_salida[1]=0;
-                sprintf((char*)buffer_salida, "%d", contador2);
-                pr_info("Valor del contador1: %s \n", (char*)buffer_salida);
+                                     
+                sprintf(buffer_salida, "%d", contador2);
+                pr_info("Valor del contador1: %s \n", buffer_salida);
                 break;
 
             default:
-             
                 break;
     }
 }
@@ -90,14 +87,26 @@ void timer_callback(struct timer_list *data){
 
 static ssize_t my_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
-    timer_callback(&timer);
+    timer_callback(&timer); //longitud del buff de salida
+    if (*off == 0)
+                {
+                    if (copy_to_user(buf, buffer_salida,mem_size) != 0){                  
 
-        if(copy_to_user(buf,(char*) buffer_salida, 2) != 0){
-            printk(KERN_INFO "Error al devolver contador2\n");
-            return -EFAULT;
-        }
-        printk(KERN_INFO "Leyendo\n");
-        return 0;
+                        printk(KERN_INFO "Valor del contador1: %s", buffer_salida);
+                        return -EFAULT;
+                }
+                    else
+                    {
+                        printk(KERN_INFO "leyendo contador1 \n");
+                        (*off)++;
+                        // if(strlen (buffer_salida)>len) //len debe ser la cant max de bytes leidos 
+                        //     return len; 
+                        return strlen (buffer_salida);//este es el n de bytes que se van a leer (desde buf)
+                    }
+                }
+                else
+                    return 0;
+    
 
 }
 // my_write escribe "len" bytes en "buf" y devuelve la cantidad escrita, que debe ser igual "len".
@@ -107,7 +116,9 @@ static ssize_t my_write(struct file *f, const char __user *buf, size_t len, loff
 {
     printk(KERN_INFO "SdeC_drv4: write()\n");    
 
-    memset(buffer_entrada, '\0', 2);
+    memset(buffer_entrada, '\0', mem_size);
+    // if(mem_size > len)
+    //     len = mem_size;
 
     if (copy_from_user(buffer_entrada, buf , len) != 0 )    
         return -EFAULT;
@@ -142,8 +153,19 @@ static int __init drv1_init(void) /* Constructor */
     contador2 = 0;
     struct device *dev_ret;
 
-//alocamos memoria para el buffer de entrada
+    //alocamos memoria para el buffer de entrada
+    if ((buffer_entrada = kmalloc(mem_size, GFP_KERNEL)) == 0)
+    {
+        pr_info(KERN_INFO "Error al alocar memoria para buffer_entrada\n");
+        return -1;
+    }
    
+    if ((buffer_salida = kmalloc(mem_size, GFP_KERNEL)) == 0)
+    {
+        pr_info(KERN_INFO "Error al alocar memoria para buffer_salida\n");
+        return -1;
+    }
+  
     
     // //CONFGIURACION DEL TIMER
     // // Configurando el timer que llamara a my_timer_callback
@@ -156,18 +178,18 @@ static int __init drv1_init(void) /* Constructor */
     printk(KERN_INFO "SdeC_drv4: Registrado exitosamente..!!\n");
 
 //configuracion del modulo
-    if ((ret = alloc_chrdev_region(&first, 0, 1, "SdeC")) < 0)
+    if ((ret = alloc_chrdev_region(&first, 0, 1, "SdeC_drv4")) < 0)
     {
         return ret;
     }
 
-    if (IS_ERR(cl = class_create(THIS_MODULE, "SdeC_1")))
+    if (IS_ERR(cl = class_create(THIS_MODULE, "SdeC_drive")))
     {
         unregister_chrdev_region(first, 1);
         return PTR_ERR(cl);
     }
 
-    if (IS_ERR(dev_ret = device_create(cl, NULL, first, NULL, "SdeC_1")))
+    if (IS_ERR(dev_ret = device_create(cl, NULL, first, NULL, "SdeC_drive")))
     {
         class_destroy(cl);
         unregister_chrdev_region(first, 1);
