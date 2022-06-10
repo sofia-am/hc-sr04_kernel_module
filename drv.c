@@ -15,14 +15,18 @@
 #include <linux/string.h>
 #include <linux/delay.h>
 
-#define mem_size 128
+//Timer Variable
+#define TIMEOUT 1000 //milisegundos
+
+//Estructura para config de timer
+static struct timer_list timer;
 
 static dev_t first; 		// Global variable for the first device number
 static struct cdev c_dev; 	// Global variable for the character device structure
 static struct class *cl; 	// Global variable for the device class
 
-char *buffer_entrada;
-char *buffer_salida;
+char buffer_entrada[2];
+char buffer_salida[2];
 int contador1;
 int contador2;
 
@@ -37,6 +41,40 @@ static int my_close(struct inode *i, struct file *f)
     return 0;
 }
 
+void timer_callback(struct timer_list *data){
+    pr_info("Valor entrada: %c \n",buffer_entrada[0]);
+
+
+    switch (buffer_entrada[0])
+        {
+            case 'a':
+                contador1++;
+                if(contador1 == 30)
+                    contador1 = 0;
+      
+                buffer_salida[0]=0;
+                buffer_salida[1]=0;
+                sprintf((char*)buffer_salida, "%d", contador1);
+                pr_info("Valor del contador1: %s \n",(char*) buffer_salida);
+                
+                break;
+
+            case 'b': 
+                contador2++;
+                if(contador2 == 30)
+                    contador2 = 0;
+                                    
+                 buffer_salida[0]=0;
+                buffer_salida[1]=0;
+                sprintf((char*)buffer_salida, "%d", contador2);
+                pr_info("Valor del contador1: %s \n", (char*)buffer_salida);
+                break;
+
+            default:
+             
+                break;
+    }
+}
 // ssize_t resulta ser una palabra con signo.
 // Por lo tanto, puede ocurrir que devuelva un número negativo. Esto sería un error. 
 // Pero un valor de retorno no negativo tiene un significado adicional. 
@@ -52,54 +90,15 @@ static int my_close(struct inode *i, struct file *f)
 
 static ssize_t my_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
-    printk(KERN_INFO "SdeC_drv4: read()\n");
+    timer_callback(&timer);
 
-        switch (buffer_entrada[0])
-        {
-            case 'a': /* Sensar Humedad */
-		        contador1++;
-	 	        if(contador1 == 30)
-                    contador1 = 0;
-                             
-                memset(buffer_salida, NULL, mem_size);
-                sprintf(buffer_salida, "%d", contador1);
-                pr_info("Valor del contador1: %s \n", buffer_salida);
-
-                if(copy_to_user(buf, buffer_salida, mem_size) != 0){
-
-                    printk(KERN_INFO "Valor del contador1: %s", buffer_salida);
-                    return -EFAULT;
-                }
-
-                printk(KERN_INFO "leyendo contador1 \n");
-                return 0; 
-
-                        
-            case 'b': /* Sensar Temperatura */
-                
-                sprintf(buffer_salida, "%d", contador2);
-                if(copy_to_user(buf, buffer_salida, len) != 0){
-                    printk(KERN_INFO "Error al devolver contador2\n");
-                    return -EFAULT;
-                }
-
-                printk(KERN_INFO "leyendo contador2 \n");
-                return 0;
-
-            default:
-                if (*off == 0)
-                {
-                    if ( copy_to_user(buf, "5", 1) != 0)
-                        return -EFAULT;
-                    else
-                    {
-                        (*off)++;
-                        return 1;
-                    }
-                }
-                else
-                    return 0;
+        if(copy_to_user(buf,(char*) buffer_salida, 2) != 0){
+            printk(KERN_INFO "Error al devolver contador2\n");
+            return -EFAULT;
         }
+        printk(KERN_INFO "Leyendo\n");
+        return 0;
+
 }
 // my_write escribe "len" bytes en "buf" y devuelve la cantidad escrita, que debe ser igual "len".
 // Cuando hago un $ echo "bla bla bla..." > /dev/SdeC_drv3, se convoca a my_write.!!
@@ -108,21 +107,24 @@ static ssize_t my_write(struct file *f, const char __user *buf, size_t len, loff
 {
     printk(KERN_INFO "SdeC_drv4: write()\n");    
 
-    memset(buffer_entrada, '\0', mem_size);
+    memset(buffer_entrada, '\0', 2);
 
-    if ( copy_from_user(buffer_entrada, buf , len) != 0 )    
+    if (copy_from_user(buffer_entrada, buf , len) != 0 )    
         return -EFAULT;
     else{
         if(buffer_entrada[0] == 'a'){
-            contador1++;
+            //contador1++;
         }
         else if(buffer_entrada[0] == 'b'){
-            contador2+=2;
+            //contador2+=2;
         }       
         return len;
     }
             
 }
+
+
+
 
 static struct file_operations pugs_fops =
 {
@@ -133,7 +135,7 @@ static struct file_operations pugs_fops =
     .write = my_write
 };
 
-static int __init drv4_init(void) /* Constructor */
+static int __init drv1_init(void) /* Constructor */
 {
     int ret;
     contador1 = 0;
@@ -141,32 +143,31 @@ static int __init drv4_init(void) /* Constructor */
     struct device *dev_ret;
 
 //alocamos memoria para el buffer de entrada
-    if ((buffer_entrada = kmalloc(mem_size, GFP_KERNEL)) == 0)
-    {
-        pr_info(KERN_INFO "Error al alocar memoria para buffer_entrada\n");
-        return -1;
-    }
    
-    if ((buffer_salida = kmalloc(mem_size, GFP_KERNEL)) == 0)
-    {
-        pr_info(KERN_INFO "Error al alocar memoria para buffer_salida\n");
-        return -1;
-    }
+    
+    // //CONFGIURACION DEL TIMER
+    // // Configurando el timer que llamara a my_timer_callback
+    // timer_setup(&timer, timer_callback, 0);
+
+    // // Configurando el intervalo del timer basado en la macro TIMEOUT
+    // mod_timer(&timer, jiffies + msecs_to_jiffies(TIMEOUT));
+
  
     printk(KERN_INFO "SdeC_drv4: Registrado exitosamente..!!\n");
 
-    if ((ret = alloc_chrdev_region(&first, 0, 1, "SdeC_drv4")) < 0)
+//configuracion del modulo
+    if ((ret = alloc_chrdev_region(&first, 0, 1, "SdeC")) < 0)
     {
         return ret;
     }
 
-    if (IS_ERR(cl = class_create(THIS_MODULE, "SdeC_drive")))
+    if (IS_ERR(cl = class_create(THIS_MODULE, "SdeC_1")))
     {
         unregister_chrdev_region(first, 1);
         return PTR_ERR(cl);
     }
 
-    if (IS_ERR(dev_ret = device_create(cl, NULL, first, NULL, "SdeC_drv4")))
+    if (IS_ERR(dev_ret = device_create(cl, NULL, first, NULL, "SdeC_1")))
     {
         class_destroy(cl);
         unregister_chrdev_region(first, 1);
@@ -184,17 +185,17 @@ static int __init drv4_init(void) /* Constructor */
     return 0;
 }
 
-static void __exit drv4_exit(void) /* Destructor */
+static void __exit drv1_exit(void) /* Destructor */
 {
     cdev_del(&c_dev);
     device_destroy(cl, first);
     class_destroy(cl);
     unregister_chrdev_region(first, 1);
-    printk(KERN_INFO "SdeC_drv4: dice Adios mundo cruel..!!\n");
+    printk(KERN_INFO "SdeC_1: dice Adios mundo cruel..!!\n");
 }
 
-module_init(drv4_init);
-module_exit(drv4_exit);
+module_init(drv1_init);
+module_exit(drv1_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Cátedra Sistemas de Computación");

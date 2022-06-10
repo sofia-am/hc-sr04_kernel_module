@@ -1,4 +1,4 @@
-obj-m += drv4.o 
+obj-m += drv.o 
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules

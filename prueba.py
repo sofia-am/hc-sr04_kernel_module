@@ -22,7 +22,7 @@ def set_figure():
     ax1.set_yticks(np.arange(0, 35, 5))
     ax1.set_xticks(np.arange(0, 60, 10))
 
-DEVICE_FILE = "/dev/SdeC_drv4"
+DEVICE_FILE = "/dev/SdeC_1"
 
 def write(channel):    
     
@@ -49,11 +49,11 @@ def graficar(self):
     print("Valor: ",valor1)        
     line.set_data(x_data, y1_data) 
     return line
-
+    
 
 valor = input("ingrese un valor: ")
 write(valor)
-read_sensor()
+#read_sensor()
 set_figure()
 animacion = animation.FuncAnimation(fig, graficar, interval=3000)
 plt.show()
