@@ -11,11 +11,10 @@ line, = ax1.plot([], [], lw=7, color ='r')
 def set_figure():
     
     fig.set_size_inches(6,4)
-    fig.suptitle('Sensado de Temperatura-Humedad', fontsize=10 , color='red')
+    fig.suptitle('Titulo', fontsize=10 , color='red')
 
-    ax1.set_title('Sensor de humedad',fontdict={'color':'red','weight':'bold','size' : 5}, pad=14)
     ax1.set_xlabel('Tiempo[s]',fontdict={'color':'white','weight':'bold','size' : 10})
-    ax1.set_ylabel('Humedad [%]',fontdict={'color':'white','weight':'bold','size' : 14})
+    ax1.set_ylabel('Pulsaciones [%]',fontdict={'color':'white','weight':'bold','size' : 14})
      
     ax1.tick_params(axis='both', which='major', labelsize=14)
     ax1.tick_params(axis='both', which='minor', labelsize=12)
