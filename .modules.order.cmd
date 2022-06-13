@@ -1,1 +1,0 @@
-cmd_/home/pi/Documents/hc-sr04_kernel_module/modules.order := {   echo /home/pi/Documents/hc-sr04_kernel_module/driver.ko; :; } | awk '!x[$$0]++' - > /home/pi/Documents/hc-sr04_kernel_module/modules.order
