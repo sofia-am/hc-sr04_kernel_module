@@ -18,10 +18,11 @@ def set_figure():
      
     ax1.tick_params(axis='both', which='major', labelsize=14)
     ax1.tick_params(axis='both', which='minor', labelsize=12)
+  
     ax1.set_yticks(np.arange(0, 35, 5))
     ax1.set_xticks(np.arange(0, 60, 10))
 
-DEVICE_FILE = "/dev/SdeC_drive"
+DEVICE_FILE = "/dev/ASMAN_driver"
 
 def write(channel):    
     
@@ -42,7 +43,7 @@ def read_sensor():
 def graficar(self):
     global time1
     time1 += 3
-    valor1 =float( read_sensor())
+    valor1 = float(read_sensor())
     x_data.append(time1)
     y1_data.append(valor1)
     print("Valor: ",valor1,"\n")        
@@ -50,13 +51,12 @@ def graficar(self):
     return line
     
 
-valor = input("ingrese un valor: ")
+valor = input("Ingrese un valor: ")
 write(valor)
 set_figure()
 animacion = animation.FuncAnimation(fig, graficar, interval=3000)
 plt.show()
 
-while True:
     
 
   

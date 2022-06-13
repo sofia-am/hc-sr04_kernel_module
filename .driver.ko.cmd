@@ -1,0 +1,1 @@
+cmd_/home/pi/Documents/hc-sr04_kernel_module/driver.ko := ld -r -EL --build-id=sha1  -T scripts/module.lds -o /home/pi/Documents/hc-sr04_kernel_module/driver.ko /home/pi/Documents/hc-sr04_kernel_module/driver.o /home/pi/Documents/hc-sr04_kernel_module/driver.mod.o;  true

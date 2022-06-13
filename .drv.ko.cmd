@@ -1,1 +1,0 @@
-cmd_/home/pi/Documents/hc-sr04_kernel_module/drv.ko := ld -r -EL --build-id=sha1  -T scripts/module.lds -o /home/pi/Documents/hc-sr04_kernel_module/drv.ko /home/pi/Documents/hc-sr04_kernel_module/drv.o /home/pi/Documents/hc-sr04_kernel_module/drv.mod.o;  true
