@@ -56,6 +56,8 @@ set_figure()
 animacion = animation.FuncAnimation(fig, graficar, interval=3000)
 plt.show()
 
+while True:
+    
 
   
     

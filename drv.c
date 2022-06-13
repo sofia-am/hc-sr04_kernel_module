@@ -19,12 +19,21 @@
 #define TIMEOUT 1000 //milisegundos
 
 #define mem_size 5
+#define GPIO_21 (21)
+#define GPIO_16 (16)
+#define GPIO_20 (20)
+
 //Estructura para config de timer
 static struct timer_list timer;
 
 static dev_t first; 		// Global variable for the first device number
 static struct cdev c_dev; 	// Global variable for the character device structure
 static struct class *cl; 	// Global variable for the device class
+
+static struct gpio buttons[] = {
+    {16, GPIOF_IN, "BUTTON 1"}, 
+    {20, GPIOF_IN, "BUTTON 2"}, 
+};
 
 char *buffer_entrada;
 char *buffer_salida;
@@ -50,19 +59,13 @@ void timer_callback(struct timer_list *data){
     switch (buffer_entrada[0])
         {
             case 'a':
-                contador1++;
-                if(contador1 == 30)
-                    contador1 = 0;
-       
+      
                 sprintf(buffer_salida, "%d", contador1);
                 pr_info("Valor del contador1: %s \n",buffer_salida);
                 
                 break;
 
-            case 'b': 
-                contador2++;
-                if(contador2 == 30)
-                    contador2 = 0;
+            case 'b':
                                      
                 sprintf(buffer_salida, "%d", contador2);
                 pr_info("Valor del contador1: %s \n", buffer_salida);
@@ -72,6 +75,7 @@ void timer_callback(struct timer_list *data){
                 break;
     }
 }
+
 // ssize_t resulta ser una palabra con signo.
 // Por lo tanto, puede ocurrir que devuelva un número negativo. Esto sería un error. 
 // Pero un valor de retorno no negativo tiene un significado adicional. 
@@ -87,25 +91,40 @@ void timer_callback(struct timer_list *data){
 
 static ssize_t my_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
-    timer_callback(&timer); //longitud del buff de salida
+    //timer_callback(&timer); //longitud del buff de salida
     if (*off == 0)
-                {
-                    if (copy_to_user(buf, buffer_salida,mem_size) != 0){                  
+    {
+        if(gpio_get_value(GPIO_16)){
+            contador1++;
+            if(contador1 == 30)
+                    contador1 = 0;
+            gpio_set_value(GPIO_21, 1);
+        }
+        if(gpio_get_value(GPIO_20)){
+            contador2++;
+            if(contador2 == 30)
+                contador2 = 0;
+            gpio_set_value(GPIO_21, 0);
+        }
 
-                        printk(KERN_INFO "Valor del contador1: %s", buffer_salida);
-                        return -EFAULT;
-                }
-                    else
-                    {
-                        printk(KERN_INFO "leyendo contador1 \n");
-                        (*off)++;
-                        // if(strlen (buffer_salida)>len) //len debe ser la cant max de bytes leidos 
-                        //     return len; 
-                        return strlen (buffer_salida);//este es el n de bytes que se van a leer (desde buf)
-                    }
-                }
-                else
-                    return 0;
+        timer_callback(&timer);
+
+        if (copy_to_user(buf, buffer_salida,mem_size) != 0){                  
+
+            printk(KERN_INFO "Valor del contador1: %s", buffer_salida);
+            return -EFAULT;
+    }
+        else
+        {
+            printk(KERN_INFO "leyendo contador1 \n");
+            (*off)++;
+            // if(strlen (buffer_salida)>len) //len debe ser la cant max de bytes leidos 
+            //     return len; 
+            return strlen (buffer_salida);//este es el n de bytes que se van a leer (desde buf)
+        }
+    }
+    else
+        return 0;
     
 
 }
@@ -148,7 +167,7 @@ static struct file_operations pugs_fops =
 
 static int __init drv1_init(void) /* Constructor */
 {
-    int ret;
+    int ret = 0;
     contador1 = 0;
     contador2 = 0;
     struct device *dev_ret;
@@ -204,7 +223,40 @@ static int __init drv1_init(void) /* Constructor */
         unregister_chrdev_region(first, 1);
         return ret;
     }
+
+    if (gpio_is_valid(GPIO_21) == false)
+    {
+        pr_err("GPIO %d is not valid\n", GPIO_21);
+        goto fail1;
+    }
+
+    //Solicitando el GPIO
+    if (gpio_request(GPIO_21, "GPIO_21") < 0)
+    {
+        pr_err("ERROR: GPIO %d request\n", GPIO_21);
+        goto fail1;
+    }
+
+    //Configurando el GPIO como salida
+    gpio_direction_output(GPIO_21, 0);
+
+    //Registro de BUTTON GPIOs
+    ret = gpio_request_array(buttons, ARRAY_SIZE(buttons));
+
+    if (ret)
+    {
+        printk(KERN_ERR "Unable to request GPIOs for BUTTONs: %d\n", ret);
+        goto fail2;
+    }
+
     return 0;
+
+fail1:
+    gpio_free(GPIO_21);
+fail2:
+    gpio_free_array(buttons, ARRAY_SIZE(buttons));
+
+    return -1;
 }
 
 static void __exit drv1_exit(void) /* Destructor */
@@ -213,6 +265,7 @@ static void __exit drv1_exit(void) /* Destructor */
     device_destroy(cl, first);
     class_destroy(cl);
     unregister_chrdev_region(first, 1);
+    
     printk(KERN_INFO "SdeC_1: dice Adios mundo cruel..!!\n");
 }
 
